@@ -156,7 +156,11 @@ async function downloadBlob(url) {
   }
 }
 
-async function saveFile(url, filename, { allowPicker }) {
+function mimeFor(filename) {
+  return filename.endsWith('.mp3') ? 'audio/mpeg' : 'video/mp4';
+}
+
+async function saveFile(url, filename, { allowPicker = false, allowShare = false, title = '' } = {}) {
   let blob;
   try {
     blob = await downloadBlob(url);
@@ -167,13 +171,29 @@ async function saveFile(url, filename, { allowPicker }) {
     return 'opened';
   }
 
+  const type = blob.type && blob.type !== 'application/octet-stream' ? blob.type : mimeFor(filename);
+
+  // Phones: the native share sheet is the only route into Photos / Gallery
+  if (allowShare && navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: title || 'Snatch' });
+        return 'shared';
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') return 'cancelled';
+      // gesture expired or unsupported — fall through to a normal download
+    }
+  }
+
   if (allowPicker && settings.autoSave && 'showSaveFilePicker' in window) {
     try {
       const handle = await window.showSaveFilePicker({
         suggestedName: filename,
         types: [{
           description: filename.endsWith('.mp3') ? 'Audio' : 'Video',
-          accept: { [filename.endsWith('.mp3') ? 'audio/mpeg' : 'video/mp4']: ['.' + filename.split('.').pop()] },
+          accept: { [mimeFor(filename)]: ['.' + filename.split('.').pop()] },
         }],
       });
       const w = await handle.createWritable();
@@ -439,34 +459,44 @@ function showResult(data, link) {
   $('#saveBtn').disabled = false;
   $('#saveBtn').textContent = 'Save';
 
-  $('#saveBtn').onclick = async () => {
+  const canShareFiles = !!(navigator.canShare && navigator.canShare({ files: [new File([''], 'x.mp4', { type: 'video/mp4' })] }));
+  const shareBtn = $('#shareBtn');
+  shareBtn.hidden = !canShareFiles;
+
+  const runSave = async (btn, shareMode) => {
     const s = pickSource(data, opts);
     if (!s.url) { toast('That format is not available for this video'); return; }
-    $('#saveBtn').disabled = true;
-    $('#saveBtn').textContent = 'Saving…';
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = shareMode ? 'Preparing…' : 'Saving…';
     try {
       const name = `${sanitizeName(author || 'tiktok')}-${data.id || Date.now()}.${s.ext}`;
-      const outcome = await saveFile(s.url, name, { allowPicker: true });
-      if (outcome === 'cancelled') {
-        $('#saveBtn').textContent = 'Save';
-        $('#saveBtn').disabled = false;
-        return;
-      }
+      const outcome = await saveFile(s.url, name, {
+        allowPicker: !shareMode,
+        allowShare: shareMode,
+        title: data.title || 'TikTok video',
+      });
+      if (outcome === 'cancelled') { btn.textContent = label; btn.disabled = false; return; }
       const wasDup = recordDownload({
         url: link, id: data.id, title: data.title, author,
         format: opts.format, quality: opts.quality,
       });
-      $('#saveBtn').textContent = 'Saved ✓';
-      toast(wasDup ? 'Re-downloaded (not counted again)' : 'Snatched!');
+      btn.textContent = outcome === 'shared' ? 'Sent ✓' : 'Saved ✓';
+      setTimeout(() => { btn.textContent = label; btn.disabled = false; }, 2500);
+      toast(wasDup ? 'Re-downloaded (not counted again)'
+        : outcome === 'shared' ? 'Choose "Save Video" to add it to your gallery'
+        : 'Snatched!');
     } catch (err) {
-      $('#saveBtn').textContent = 'Save';
-      $('#saveBtn').disabled = false;
+      btn.textContent = label;
+      btn.disabled = false;
       $('#retryBtn').hidden = false;
-      $('#retryBtn').onclick = () => $('#saveBtn').click();
+      $('#retryBtn').onclick = () => btn.click();
       toast(err.message || 'Save failed');
     }
   };
 
+  $('#saveBtn').onclick = () => runSave($('#saveBtn'), false);
+  shareBtn.onclick = () => runSave(shareBtn, true);
   $('#openBtn').onclick = () => window.open(pickSource(data, opts).url, '_blank', 'noopener');
 }
 
@@ -561,21 +591,28 @@ async function runQueue(links) {
 }
 
 /* ---------------- clipboard ---------------- */
+let clipboardChecking = false;
 async function checkClipboard() {
+  if (clipboardChecking) return;
   if (!navigator.clipboard || !navigator.clipboard.readText) return;
+  if (document.visibilityState !== 'visible') return;
+  clipboardChecking = true;
   let text = '';
   try {
     text = await navigator.clipboard.readText();
   } catch {
-    return; // permission denied or not allowed without gesture
+    clipboardChecking = false;
+    return; // permission denied or not allowed without a gesture (e.g. iOS Safari)
   }
-  const m = text.match(TT_URL_RE);
-  if (!m) return;
-  const link = m[0];
-  if (normalizeUrl(link) === normalizeUrl($('#linkInput').value || '')) return;
-  if (load(KEYS.dismissed, '') === normalizeUrl(link)) return;
+  clipboardChecking = false;
 
   const banner = $('#clipboardBanner');
+  const m = text.match(TT_URL_RE);
+  if (!m) { banner.hidden = true; return; }
+  const link = m[0];
+  if (normalizeUrl(link) === normalizeUrl($('#linkInput').value || '')) { banner.hidden = true; return; }
+  if (load(KEYS.dismissed, '') === normalizeUrl(link)) { banner.hidden = true; return; }
+
   banner.hidden = false;
   $('#clipPaste').onclick = () => {
     $('#linkInput').value = link;
