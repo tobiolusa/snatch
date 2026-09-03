@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#000000" />
+  <meta name="description" content="Snatch TikTok videos without the watermark — a fast, installable PWA." />
+  <title>Snatch — TikTok Downloader</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/favicon.png" sizes="32x32" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <img src="icons/icon.svg" alt="" class="brand-mark" width="28" height="28" />
+        <span class="brand-name">Snatch</span>
+      </div>
+      <div class="topbar-actions">
+        <button id="navHome" class="iconbtn" title="Home" aria-label="Home">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="navStats" class="iconbtn" title="Stats" aria-label="Stats">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="navSettings" class="iconbtn" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- ============ HOME VIEW ============ -->
+      <section id="view-home" class="view">
+        <div id="clipboardBanner" class="banner" hidden>
+          <span>A TikTok link is on your clipboard.</span>
+          <div class="banner-actions">
+            <button id="clipPaste" class="btn btn-sm btn-accent">Paste it</button>
+            <button id="clipDismiss" class="btn btn-sm btn-ghost">Dismiss</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <label for="linkInput" class="label">TikTok link<span class="hint" id="batchHint" hidden> · one per line for batch</span></label>
+          <textarea id="linkInput" class="input" rows="1" placeholder="https://www.tiktok.com/@user/video/..." autocomplete="off" spellcheck="false"></textarea>
+          <div class="row wrap gap">
+            <button id="pasteBtn" class="btn btn-ghost">Paste</button>
+            <button id="batchToggle" class="btn btn-ghost" aria-pressed="false">Batch mode</button>
+            <button id="clearInput" class="btn btn-ghost">Clear</button>
+          </div>
+
+          <div class="options">
+            <div class="opt-group" role="group" aria-label="Format">
+              <span class="opt-label">Format</span>
+              <div class="segmented" id="formatSeg">
+                <button data-val="video" class="seg active">Video</button>
+                <button data-val="audio" class="seg">Audio</button>
+              </div>
+            </div>
+            <div class="opt-group" role="group" aria-label="Quality">
+              <span class="opt-label">Quality</span>
+              <div class="segmented" id="qualitySeg">
+                <button data-val="sd" class="seg active">Standard</button>
+                <button data-val="hd" class="seg">HD</button>
+              </div>
+            </div>
+          </div>
+          <label class="check">
+            <input type="checkbox" id="watermarkToggle" />
+            <span>Original file (keep watermark) — use if the clean version fails</span>
+          </label>
+
+          <button id="fetchBtn" class="btn btn-accent btn-block">Snatch it</button>
+        </div>
+
+        <div id="status" class="status" hidden></div>
+
+        <div id="queuePanel" class="card" hidden>
+          <div class="row between">
+            <h2 class="card-title">Queue</h2>
+            <button id="clearQueue" class="btn btn-sm btn-ghost">Clear</button>
+          </div>
+          <ul id="queueList" class="queue-list"></ul>
+        </div>
+
+        <div id="resultCard" class="card result" hidden>
+          <div class="result-media">
+            <video id="resultVideo" controls playsinline preload="metadata"></video>
+            <audio id="resultAudio" controls hidden></audio>
+          </div>
+          <div class="result-meta">
+            <p id="resultTitle" class="result-title"></p>
+            <p id="resultAuthor" class="result-author"></p>
+          </div>
+          <div class="row wrap gap">
+            <button id="saveBtn" class="btn btn-accent">Save</button>
+            <button id="retryBtn" class="btn btn-ghost" hidden>Retry</button>
+            <button id="openBtn" class="btn btn-ghost">Open in new tab</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row between">
+            <h2 class="card-title">Recent</h2>
+            <span class="counter" id="lifetimeCounter" title="Lifetime downloads">0</span>
+          </div>
+          <ul id="historyList" class="history-list"></ul>
+          <p id="historyEmpty" class="muted">Nothing snatched yet.</p>
+        </div>
+      </section>
+
+      <!-- ============ STATS VIEW ============ -->
+      <section id="view-stats" class="view" hidden>
+        <div class="card">
+          <h2 class="card-title">Stats</h2>
+          <div class="stat-grid">
+            <div class="stat"><span class="stat-num" id="statToday">0</span><span class="stat-lbl">Today</span></div>
+            <div class="stat"><span class="stat-num" id="statWeek">0</span><span class="stat-lbl">This week</span></div>
+            <div class="stat"><span class="stat-num" id="statPrevWeek">0</span><span class="stat-lbl">Last week</span></div>
+            <div class="stat"><span class="stat-num" id="statTotal">0</span><span class="stat-lbl">Lifetime</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Last 14 days</h3>
+          <div id="dayChart" class="day-chart"></div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">By day</h3>
+          <ul id="dayBreakdown" class="history-list"></ul>
+        </div>
+      </section>
+
+      <!-- ============ SETTINGS VIEW ============ -->
+      <section id="view-settings" class="view" hidden>
+        <div class="card">
+          <h2 class="card-title">Settings</h2>
+          <label class="setting-row">
+            <span>Theme</span>
+            <div class="segmented" id="themeSeg">
+              <button data-val="dark" class="seg active">Dark</button>
+              <button data-val="light" class="seg">Light</button>
+            </div>
+          </label>
+          <label class="setting-row">
+            <span>Auto-save to device<br /><small class="muted">Uses the file picker where supported</small></span>
+            <input type="checkbox" id="autoSaveToggle" class="switch" />
+          </label>
+          <label class="setting-row">
+            <span>Default format</span>
+            <div class="segmented" id="defFormatSeg">
+              <button data-val="video" class="seg active">Video</button>
+              <button data-val="audio" class="seg">Audio</button>
+            </div>
+          </label>
+          <label class="setting-row">
+            <span>Warn on duplicate links</span>
+            <input type="checkbox" id="dupToggle" class="switch" checked />
+          </label>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Data</h3>
+          <div class="row wrap gap">
+            <button id="exportBtn" class="btn btn-ghost">Export history (.txt)</button>
+            <button id="resetCounterBtn" class="btn btn-ghost">Reset counter</button>
+            <button id="clearHistoryBtn" class="btn btn-danger">Clear history</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">About</h3>
+          <p class="muted">Snatch is a PWA. It uses the public tikwm.com API to remove watermarks. Downloads and stats live only on this device. <span id="swState"></span></p>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

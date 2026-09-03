@@ -1,0 +1,32 @@
+{
+  "name": "Snatch — TikTok Downloader",
+  "short_name": "Snatch",
+  "description": "Snatch TikTok videos without the watermark. Video or audio, standard or HD, batch queue, offline-ready PWA.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "share_target": {
+    "action": "/",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    { "name": "Batch mode", "url": "/?view=batch", "short_name": "Batch" },
+    { "name": "Stats", "url": "/?view=stats", "short_name": "Stats" }
+  ]
+}
